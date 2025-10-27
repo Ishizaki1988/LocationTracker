@@ -1,8 +1,10 @@
 import os
 import sys
+import subprocess
 import tkinter as tk
 from PIL import Image, ImageTk
 from lists import item_images, orte
+from tkinter import messagebox as mb
 
 ROWS = 18  # number of rows per side
 LEFT_NAME_COL = 0
@@ -40,12 +42,36 @@ class LocationTrackerApp:
     def _create_menu(self):
         menubar = tk.Menu(self.root)
         program_menu = tk.Menu(menubar, tearoff=0)
-        program_menu.add_command(
-            label="Restart",
-            command=lambda: os.execv(sys.executable, [sys.executable] + sys.argv),
-        )
+
+        def _do_restart():
+            try:
+                # Use subprocess to launch a new process instead of os.execv,
+                # which can raise FileNotFoundError in some environments.
+                subprocess.Popen([sys.executable] + sys.argv)
+                # Quit the current application after launching the new process.
+                self.root.quit()
+            except Exception as e:
+                mb.showerror("Restart failed", f"Could not restart application:\n{e}")
+                mb.showerror("Restart failed", f"Could not restart application:\n{e}")
+
+        def _confirm_restart():
+            if mb.askyesno("Restart", "Restart application? Unsaved changes will be lost."):
+                _do_restart()
+
+        program_menu.add_command(label="Restart", accelerator="Ctrl+R", command=_confirm_restart)
+        program_menu.add_separator()
+        program_menu.add_command(label="Exit", accelerator="Ctrl+Q", command=self.root.quit)
         menubar.add_cascade(label="Program", menu=program_menu)
+
+        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label="About", command=lambda: mb.showinfo("About", "Ishizakis Location Tracker"))
+        menubar.add_cascade(label="Help", menu=help_menu)
+
         self.root.config(menu=menubar)
+
+        # Global shortcuts
+        self.root.bind_all("<Control-r>", lambda e: _confirm_restart())
+        self.root.bind_all("<Control-q>", lambda e: self.root.quit())
 
     def _create_name_columns(self):
         # left names (first ROWS entries)
