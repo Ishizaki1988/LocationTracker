@@ -1,110 +1,145 @@
-
-import tkinter as tk
 import os
+import sys
+import tkinter as tk
 from PIL import Image, ImageTk
 from lists import item_images, orte
-import sys
 
-# Function to handle dropping images into the main window
-def on_drop(event):
-    widget = event.widget
-    if not hasattr(widget, '_drag_data'):
-        widget._drag_data = {"x": 0, "y": 0}
-    x = widget.winfo_x() - widget._drag_data["x"] + event.x
-    y = widget.winfo_y() - widget._drag_data["y"] + event.y
-    widget.place(x=x, y=y)
-
-def on_drag_start(event):
-    widget = event.widget
-    widget._drag_data = {"x": event.x, "y": event.y}
-
-def on_drag_motion(event):
-    widget = event.widget
-    x = widget.winfo_x() - widget._drag_data["x"] + event.x
-    y = widget.winfo_y() - widget._drag_data["y"] + event.y
-    widget.place(x=x, y=y)
-    
-# Erstelle ein Fenster
-fenster = tk.Tk()
-fenster.configure(bg='black')
-fenster.title("Ishizakis Location Tracker")
-fenster.resizable(False, False)  # Prevent the window from being resized
-
-# Define the base path for the images
-base_path = os.path.join(os.path.dirname(__file__), 'images')
-
-# Create a menu bar
-menubar = tk.Menu(fenster)
-
-# Create a "Program" menu
-program_menu = tk.Menu(menubar, tearoff=0)
-program_menu.add_command(label="Restart", command=lambda: os.execv(sys.executable, ['python'] + sys.argv))
-
-# Add the "Program" menu to the menu bar
-menubar.add_cascade(label="Program", menu=program_menu)
-
-# Configure the window to use the menu bar
-fenster.config(menu=menubar)
-
-# Create a main frame to hold all other frames
-main_frame = tk.Frame(fenster, bg='black')
-main_frame.pack(fill='both', expand=True, padx=10, pady=10)
-
-# Add 4 additional columns with the Gossip Stone image
-gossip_image_path = os.path.join(base_path, 'Miscellaneous', 'Gossip-Stone.png')
-gossip_img = Image.open(gossip_image_path)
-gossip_img = gossip_img.resize((20, 20), Image.LANCZOS)  # Resize the image to 30x30 pixels
-gossip_photo = ImageTk.PhotoImage(gossip_img)
-
-for row in range(18):
-    for col in range(1):
-        label = tk.Label(main_frame, text=f"{orte[row]}", font=("Helvetica", 12), bg='black', fg='white')
-        label.grid(row=row, column=0, padx=1, pady=5)
+ROWS = 18  # number of rows per side
+LEFT_NAME_COL = 0
+RIGHT_NAME_COL = 6
+LEFT_GOSSIP_COLS = range(2, 6)   # 2,3,4,5
+RIGHT_GOSSIP_COLS = range(7, 11) # 7,8,9,10
+GOSSIP_SIZE = (20, 20)
+WINDOW_SIZE = "500x650"
 
 
-for row in range(18):
-    for col in range(2, 6): 
-        label = tk.Label(main_frame, image=gossip_photo, bg='black')
-        label.image = gossip_photo  # Keep a reference to avoid garbage collection
-        label.grid(row=row, column=col, padx=1, pady=1)
+class LocationTrackerApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Ishizakis Location Tracker")
+        self.root.configure(bg="black")
+        self.root.resizable(False, False)
+        self.base_path = os.path.join(os.path.dirname(__file__), "images")
 
-for row in range(18, 35):
-    for col in range(6):
-        label = tk.Label(main_frame, text=f"{orte[row]}", font=("Helvetica", 12), bg='black', fg='white')
-        label.grid(row=row-18, column=6, padx=1, pady=5)
+        self._load_gossip_image()
+        self._create_menu()
+        self.main_frame = tk.Frame(self.root, bg="black")
+        self.main_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-for row in range(18):
-    for col in range(7, 11): 
-        label = tk.Label(main_frame, image=gossip_photo, bg='black')
-        label.image = gossip_photo  # Keep a reference to avoid garbage collection
-        label.grid(row=row, column=col, padx=1, pady=1)
+        self._create_name_columns()
+        self._create_gossip_grids()
+        self._enable_preselected_dragging()
 
-row = 0
-col = 0
+        self.root.geometry(WINDOW_SIZE)
 
-for item, image_path in item_images.items():
-    img = Image.open(image_path)
-    img = img.resize((20, 20), Image.LANCZOS)  # Resize the image to 30x30 pixels
-    photo = ImageTk.PhotoImage(img)
-    label = tk.Label(main_frame, image=photo, bg='black')
-    label.image = photo  # Keep a reference to avoid garbage collection
-    label.grid(row=row, column=col + 12, padx=1, pady=1, sticky='e')  # Start from column 6 and align right
-    col += 1
-    if col == 4:  # Adjust the number of columns to 4
-        col = 0
-        row += 1
-        
-# Make the images draggable, except for the gossip images
-for widget in main_frame.winfo_children():
-    if isinstance(widget, tk.Label) and widget.cget("image") != str(gossip_photo):
-        widget.bind("<Button-1>", on_drag_start)
-        widget.bind("<B1-Motion>", on_drag_motion)
+    def _load_gossip_image(self):
+        path = os.path.join(self.base_path, "Miscellaneous", "Gossip-Stone.png")
+        img = Image.open(path).resize(GOSSIP_SIZE, Image.LANCZOS)
+        self.gossip_photo = ImageTk.PhotoImage(img)
 
-fenster.geometry("500x650")
+    def _create_menu(self):
+        menubar = tk.Menu(self.root)
+        program_menu = tk.Menu(menubar, tearoff=0)
+        program_menu.add_command(
+            label="Restart",
+            command=lambda: os.execv(sys.executable, [sys.executable] + sys.argv),
+        )
+        menubar.add_cascade(label="Program", menu=program_menu)
+        self.root.config(menu=menubar)
 
-# Starte die Hauptereignisschleife
-fenster.mainloop()
+    def _create_name_columns(self):
+        # left names (first ROWS entries)
+        for i, name in enumerate(orte[:ROWS]):
+            lbl = tk.Label(self.main_frame, text=name, font=("Helvetica", 12), bg="black", fg="white")
+            lbl.grid(row=i, column=LEFT_NAME_COL, padx=1, pady=5)
+
+        # right names (next entries, preserve original slicing up to index 35)
+        right_slice = orte[ROWS:35]
+        for i, name in enumerate(right_slice):
+            lbl = tk.Label(self.main_frame, text=name, font=("Helvetica", 12), bg="black", fg="white")
+            lbl.grid(row=i, column=RIGHT_NAME_COL, padx=1, pady=5)
+
+    def _create_gossip_grids(self):
+        # helper to create gossip cells and bind selector
+        def make_gossip_cell(r, c):
+            lbl = tk.Label(self.main_frame, image=self.gossip_photo, bg="black", cursor="hand2")
+            lbl.image = self.gossip_photo  # prevent GC
+            lbl.is_gossip = True
+            lbl.grid(row=r, column=c, padx=1, pady=1)
+            lbl.bind("<Double-Button-1>", lambda e, target=lbl: self._open_selector(target))
+            return lbl
+
+        # left side grids (rows 0..ROWS-1, cols LEFT_GOSSIP_COLS)
+        for r in range(ROWS):
+            for c in LEFT_GOSSIP_COLS:
+                make_gossip_cell(r, c)
+
+        # right side grids (rows 0..ROWS-1, cols RIGHT_GOSSIP_COLS)
+        for r in range(ROWS):
+            for c in RIGHT_GOSSIP_COLS:
+                make_gossip_cell(r, c)
+
+    def _open_selector(self, target_label):
+        sel = tk.Toplevel(self.root)
+        sel.title("Select Item")
+        sel.configure(bg="black")
+        sel.resizable(False, False)
+        sel.transient(self.root)
+        sel.grab_set()
+        sel.focus_set()
+
+        cols = 4
+        row = col = 0
+        for item, image_path in item_images.items():
+            img = Image.open(image_path).resize(GOSSIP_SIZE, Image.LANCZOS)
+            photo = ImageTk.PhotoImage(img)
+            item_lbl = tk.Label(sel, image=photo, bg="black", cursor="hand2")
+            item_lbl.image = photo
+            item_lbl.grid(row=row, column=col, padx=4, pady=4)
+
+            def choose(e, chosen_photo=photo, target=target_label):
+                target.config(image=chosen_photo)
+                target.image = chosen_photo
+                # mark as non-gossip and enable dragging
+                target.is_gossip = False
+                target.bind("<Button-1>", self._on_drag_start)
+                target.bind("<B1-Motion>", self._on_drag_motion)
+                sel.destroy()
+
+            item_lbl.bind("<Button-1>", choose)
+
+            col += 1
+            if col >= cols:
+                col = 0
+                row += 1
+
+    # Dragging helpers
+    def _on_drag_start(self, event):
+        widget = event.widget
+        widget._drag_data = {"x": event.x, "y": event.y}
+
+    def _on_drag_motion(self, event):
+        widget = event.widget
+        dx = event.x - widget._drag_data["x"]
+        dy = event.y - widget._drag_data["y"]
+        x = widget.winfo_x() + dx
+        y = widget.winfo_y() + dy
+        # use place geometry to move freely over the main frame
+        widget.place(in_=self.main_frame, x=x, y=y)
+
+    def _enable_preselected_dragging(self):
+        # Initially only enable dragging for non-gossip image labels (if any)
+        for w in self.main_frame.winfo_children():
+            if isinstance(w, tk.Label):
+                # image labels will have an 'image' attribute; gossip labels have is_gossip True
+                if getattr(w, "is_gossip", False):
+                    continue
+                if w.cget("image"):
+                    w.bind("<Button-1>", self._on_drag_start)
+                    w.bind("<B1-Motion>", self._on_drag_motion)
 
 
-
-
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = LocationTrackerApp(root)
+    root.mainloop()
