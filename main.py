@@ -12,7 +12,6 @@ RIGHT_NAME_COL = 6
 LEFT_GOSSIP_COLS = range(2, 6)   # 2,3,4,5
 RIGHT_GOSSIP_COLS = range(7, 11) # 7,8,9,10
 GOSSIP_SIZE = (20, 20)
-WINDOW_SIZE = "500x650"
 
 
 class LocationTrackerApp:
@@ -26,13 +25,19 @@ class LocationTrackerApp:
         self._load_gossip_image()
         self._create_menu()
         self.main_frame = tk.Frame(self.root, bg="black")
-        self.main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        # kein Rand mehr: kein padx/pady hier
+        self.main_frame.pack(fill="both", expand=True)
 
         self._create_name_columns()
         self._create_gossip_grids()
         self._enable_preselected_dragging()
 
-        self.root.geometry(WINDOW_SIZE)
+        # Fenstergröße automatisch an den Inhalt anpassen, damit kein Rand entsteht
+        self.root.update_idletasks()
+        w = self.main_frame.winfo_reqwidth()
+        h = self.main_frame.winfo_reqheight()
+        # setze geometry exakt auf benötigte Größe
+        self.root.geometry(f"{w}x{h}")
 
     def _load_gossip_image(self):
         path = os.path.join(self.base_path, "Miscellaneous", "Gossip-Stone.png")
@@ -45,13 +50,9 @@ class LocationTrackerApp:
 
         def _do_restart():
             try:
-                # Use subprocess to launch a new process instead of os.execv,
-                # which can raise FileNotFoundError in some environments.
                 subprocess.Popen([sys.executable] + sys.argv)
-                # Quit the current application after launching the new process.
                 self.root.quit()
             except Exception as e:
-                mb.showerror("Restart failed", f"Could not restart application:\n{e}")
                 mb.showerror("Restart failed", f"Could not restart application:\n{e}")
 
         def _confirm_restart():
