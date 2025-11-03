@@ -20,7 +20,12 @@ class LocationTrackerApp:
         self.root.title("Ishizakis Location Tracker")
         self.root.configure(bg="black")
         self.root.resizable(False, False)
-        self.base_path = os.path.join(os.path.dirname(__file__), "images")
+        # Support running from source and from a PyInstaller bundle.
+        # When bundled, PyInstaller extracts files to a temporary folder
+        # and exposes the path in sys._MEIPASS. Use that as resource root.
+        resource_root = getattr(sys, "_MEIPASS", os.path.dirname(__file__))
+        # Keep base_path as the project-relative images directory inside the resource root
+        self.base_path = os.path.join(resource_root, "images")
 
         self._load_gossip_image()
         self._create_menu()
@@ -41,7 +46,15 @@ class LocationTrackerApp:
 
     def _load_gossip_image(self):
         path = os.path.join(self.base_path, "Miscellaneous", "Gossip-Stone.png")
-        img = Image.open(path).resize(GOSSIP_SIZE, Image.LANCZOS)
+        try:
+            img = Image.open(path).resize(GOSSIP_SIZE, Image.LANCZOS)
+        except FileNotFoundError as e:
+            # Provide a clearer error message for PyInstaller bundling issues
+            raise FileNotFoundError(
+                f"Could not find gossip image at '{path}'.\n"
+                "If you built an executable, make sure you included the 'images' folder when bundling.\n"
+                "Example: pyinstaller --onefile --add-data \"images;images\" main.py\n"
+            ) from e
         self.gossip_photo = ImageTk.PhotoImage(img)
 
     def _create_menu(self):
@@ -118,7 +131,19 @@ class LocationTrackerApp:
         cols = 4
         row = col = 0
         for item, image_path in item_images.items():
-            img = Image.open(image_path).resize(GOSSIP_SIZE, Image.LANCZOS)
+            # image_path in lists.py is a relative path like 'images/Equipment/...'
+            # Resolve it against the resource root so it works both from source
+            # and when bundled by PyInstaller (sys._MEIPASS).
+            if os.path.isabs(image_path):
+                resolved = image_path
+            else:
+                resolved = os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(__file__)), image_path)
+
+            try:
+                img = Image.open(resolved).resize(GOSSIP_SIZE, Image.LANCZOS)
+            except FileNotFoundError:
+                raise FileNotFoundError(f"Could not find item image at '{resolved}'.\n"
+                                        "When bundling, include the 'images' folder with --add-data or update the spec file.")
             photo = ImageTk.PhotoImage(img)
             item_lbl = tk.Label(sel, image=photo, bg="black", cursor="hand2")
             item_lbl.image = photo
